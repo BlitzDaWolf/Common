@@ -33,12 +33,12 @@ namespace ServerService
 
         private void CreateApp()
         {
-            string appId = "5160_eXumDqvZglpLaJMYzmm3MeRgMAgRVELgg7Q1QN3K3osATWxNbU";
-            string appSecret = "EM8V2ioaBOX6Jwcw4Kca2X9IIwjYQ06IW269ggTUN9pm3lwuvX";
+            string appId = "<Appid>";
+            string appSecret = "<secret>";
 
             _token = new Token
             {
-                AccessToken = "i2YlbftJf_XJQR_xGgmY_zv5Xw2oj3lns50hhojfAnM"
+                AccessToken = "<token>"
             };
 
             _app = new App(appId, appSecret, string.Empty);
