@@ -17,12 +17,14 @@ namespace Common
             long Volume,
             string? Label = "",
             string? Comment = "",
-            decimal StopLoss = 0);
+            decimal StopLoss = 0,
+            decimal TakeProfit = 0);
         void Sell(long SymbolId,
             long Volume,
             string? Label = "",
             string? Comment = "",
-            decimal StopLoss = 0);
+            decimal StopLoss = 0,
+            decimal TakeProfit = 0);
 
         void GetPositions();
     }

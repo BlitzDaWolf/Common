@@ -1,11 +1,14 @@
 ﻿using Common;
 using Google.Protobuf;
 using Google.Protobuf.Collections;
+using Google.Protobuf.WellKnownTypes;
+using Newtonsoft.Json.Linq;
 using OpenAPI.Net;
 using OpenAPI.Net.Auth;
 using OpenAPI.Net.Helpers;
 using OpenAPICtrader.Interface;
 using Skender.Stock.Indicators;
+using System.Net.Sockets;
 using System.Reactive.Linq;
 
 namespace ServerService
@@ -19,26 +22,34 @@ namespace ServerService
         private Token _token;
         private App _app;
         private long traderId;
+        private readonly string appid;
+        private readonly string secret;
+        private readonly string token;
         private readonly List<IDisposable> _disposables = new();
 
         public Dictionary<long, ProtoOAPosition> Positions { get; set; } = new Dictionary<long, ProtoOAPosition>();
 
-        public Client(ILogger<Client> logger, IHandeler handler)
+        public Client(ILogger<Client> logger, IHandeler handler, IConfiguration configRoot)
         {
             this.handler = handler;
             this.logger = logger;
+
+            var config = configRoot.GetSection("ctrader");
+            appid = config.GetValue<string>("appid");
+            secret = config.GetValue<string>("secret");
+            token = config.GetValue<string>("token");
 
             Connect().Wait();
         }
 
         private void CreateApp()
         {
-            string appId = "<Appid>";
-            string appSecret = "<secret>";
+            string appId = appid;
+            string appSecret = secret;
 
             _token = new Token
             {
-                AccessToken = "<token>"
+                AccessToken = token
             };
 
             _app = new App(appId, appSecret, string.Empty);
@@ -159,19 +170,10 @@ namespace ServerService
             };
 
             await _client.SendMessage(request);
-
-            List<long> ids = new List<long>();
-            ids.Add(1);
-            ids.Add(2);
-            ids.Add(3);
-            ids.Add(4);
-            var r2 = new ProtoOASymbolByIdReq { CtidTraderAccountId = accountId};
-            r2.SymbolId.AddRange(ids);
-            await _client.SendMessage(r2);
         }
 
         #region Market
-        public void CreateNewMarketOrder(ProtoOATradeSide TradeSide, long SymbolId, long Volume, string? Label = "", string? Comment = "", decimal StopLoss = 0)
+        public void CreateNewMarketOrder(ProtoOATradeSide TradeSide, long SymbolId, long Volume, string? Label = "", string? Comment = "", decimal StopLoss = 0, decimal TakeProfit = 0)
         {
             logger.LogInformation($"{TradeSide} {SymbolId} {StopLoss} {Volume}");
             var newOrderReq = new ProtoOANewOrderReq
@@ -187,7 +189,7 @@ namespace ServerService
             {
                 newOrderReq.TrailingStopLoss = true;
                 newOrderReq.RelativeStopLoss = (long)((StopLoss));
-                newOrderReq.RelativeTakeProfit = (long)((StopLoss / 2));
+                newOrderReq.RelativeTakeProfit = (long)((TakeProfit));
                 // newOrderReq.RelativeStopLoss = (long)(StopLoss / (PipSize * 1));
             }
 
@@ -213,7 +215,7 @@ namespace ServerService
             };
             _client.SendMessage(request);
         }
-        public void Buy(long SymbolId, long Volume, string? Label = "", string? Comment = "", decimal StopLoss = 0)
+        public void Buy(long SymbolId, long Volume, string? Label = "", string? Comment = "", decimal StopLoss = 0, decimal TakeProfit = 0)
         {
             var v = Positions.Values.Where(x => x.TradeData.SymbolId == SymbolId).ToList();
             var c = v.Where(x => x.TradeData.TradeSide == ProtoOATradeSide.Sell).ToList();
@@ -227,10 +229,10 @@ namespace ServerService
             }
             if (d.Count == 0)
             {
-                CreateNewMarketOrder(ProtoOATradeSide.Buy, SymbolId, Volume, Label, Comment, StopLoss);
+                CreateNewMarketOrder(ProtoOATradeSide.Buy, SymbolId, Volume, Label, Comment, StopLoss, TakeProfit);
             }
         }
-        public void Sell(long SymbolId, long Volume, string? Label = "", string? Comment = "", decimal StopLoss = 0)
+        public void Sell(long SymbolId, long Volume, string? Label = "", string? Comment = "", decimal StopLoss = 0, decimal TakeProfit = 0)
         {
             var v = Positions.Values.Where(x => x.TradeData.SymbolId == SymbolId).ToList();
             var c = v.Where(x => x.TradeData.TradeSide == ProtoOATradeSide.Buy).ToList();
@@ -244,7 +246,7 @@ namespace ServerService
             }
             if (d.Count == 0)
             {
-                CreateNewMarketOrder(ProtoOATradeSide.Sell, SymbolId, Volume, Label, Comment, StopLoss);
+                CreateNewMarketOrder(ProtoOATradeSide.Sell, SymbolId, Volume, Label, Comment, StopLoss, TakeProfit);
             }
         }
         #endregion

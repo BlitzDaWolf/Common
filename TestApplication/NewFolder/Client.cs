@@ -147,7 +147,7 @@ namespace TestApplication.NewFolder
         }
 
         #region Market
-        public void CreateNewMarketOrder(ProtoOATradeSide TradeSide, long SymbolId, long Volume, string? Label = "", string? Comment = "", decimal StopLoss = 0)
+        public void CreateNewMarketOrder(ProtoOATradeSide TradeSide, long SymbolId, long Volume, string? Label = "", string? Comment = "", decimal StopLoss = 0, decimal TakeProfit = 0)
         {
             var newOrderReq = new ProtoOANewOrderReq
             {
@@ -177,8 +177,8 @@ namespace TestApplication.NewFolder
 
             _client.SendMessage(newOrderReq);
         }
-        public void Buy(long SymbolId, long Volume, string? Label = "", string? Comment = "", decimal StopLoss = 0) => CreateNewMarketOrder(ProtoOATradeSide.Buy, SymbolId, Volume, Label, Comment, StopLoss);
-        public void Sell(long SymbolId, long Volume, string? Label = "", string? Comment = "", decimal StopLoss = 0) => CreateNewMarketOrder(ProtoOATradeSide.Sell, SymbolId, Volume, Label, Comment, StopLoss);
+        public void Buy(long SymbolId, long Volume, string? Label = "", string? Comment = "", decimal StopLoss = 0, decimal TakeProfit = 0) => CreateNewMarketOrder(ProtoOATradeSide.Buy, SymbolId, Volume, Label, Comment, StopLoss, TakeProfit);
+        public void Sell(long SymbolId, long Volume, string? Label = "", string? Comment = "", decimal StopLoss = 0, decimal TakeProfit = 0) => CreateNewMarketOrder(ProtoOATradeSide.Sell, SymbolId, Volume, Label, Comment, StopLoss, TakeProfit);
         #endregion
 
         public void Subscribe(long symbolName, string timeframe, int delay)

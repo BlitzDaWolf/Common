@@ -13,6 +13,15 @@ using static System.Runtime.InteropServices.JavaScript.JSType;
 
 namespace ServerService
 {
+    public class StrategySymbol
+    {
+        public long SymbolID { get; set; }
+        public string TimeFrame { get; set; }
+        public decimal TPPip { get; set; }
+        public decimal SLPip { get; set; }
+        public long LotSize { get; set; }
+    }
+
     public class Strategy : BaseStrategy
     {
         int input_size = 15;
@@ -20,13 +29,18 @@ namespace ServerService
 
         //public Network Network { get; }
         Dictionary<long, ActivationNetwork> networks = new Dictionary<long, ActivationNetwork>();
+        Dictionary<long, StrategySymbol> StrategyValues = new Dictionary<long, StrategySymbol>();
 
-        public Strategy(IOpenClient clinet, ILogger<Strategy> logger)
+        public Strategy(IOpenClient clinet, ILogger<Strategy> logger, IConfiguration config)
         {
             Client = clinet;
-            clinet.Subscribe(1,  "H1", this, 1);
-            clinet.Subscribe(9,  "H1", this, 2);
-            clinet.Subscribe(17, "H1", this, 2);
+            var l = config.GetSection("strategy:value").Get<StrategySymbol[]>();
+            int i = 1;
+            foreach (var item in l)
+            {
+                StrategyValues.Add(item.SymbolID, item);
+                clinet.Subscribe(item.SymbolID, item.TimeFrame, this, i++);
+            }
 
             /*clinet.Subscribe(22396, "M30", this, 3);
             clinet.Subscribe(22398, "M30", this, 3);*/
@@ -37,6 +51,7 @@ namespace ServerService
 
         public override void OnBar(List<OLHC> bars)
         {
+            var v = StrategyValues[bars[0].SymbolId];
             var rsl =  (bars.Last().Close * 0.001m) * 100000;
             var b = bars.Select(x => (double)x.Close).TakeLast((60 / 1) * 24 * 30).ToList();
             if (networks.ContainsKey(bars[0].SymbolId))
@@ -45,23 +60,19 @@ namespace ServerService
                 var result = networks[bars[0].SymbolId].Compute(inp.Select(x => x / inp[0]).ToArray());
                 var difrence = Math.Abs(result[0] - result[1]);
                 // _logger.LogInformation(bars[0].SymbolId + ": " + string.Join(',', result) + "\n" + difrence);
-                long stock = 50 * 100000;
-                if(bars[0].SymbolId == 22396 || bars[0].SymbolId == 22398)
-                {
-                    stock = stock / 100000;
-                }
+                long stock = 50 * v.LotSize;
                 if (result[0] > result[1])
                 {
                     if (difrence > 0.15)
                     {
-                        Client.Buy(bars[0].SymbolId, stock, StopLoss: rsl);
+                        Client.Buy(v.SymbolID, stock, StopLoss: (v.SLPip * v.LotSize) * 100000, TakeProfit: (v.TPPip * v.LotSize) * 100000);
                     }
                 }
                 else
                 {
                     if (difrence > 0.15)
                     {
-                        Client.Sell(bars[0].SymbolId, stock, StopLoss: rsl);
+                        Client.Sell(v.SymbolID, stock, StopLoss: (v.SLPip * v.LotSize) * 100000, TakeProfit: (v.TPPip * v.LotSize) * 100000);
                     }
                 }
             }

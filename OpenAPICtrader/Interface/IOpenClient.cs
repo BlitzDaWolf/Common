@@ -8,7 +8,7 @@ namespace OpenAPICtrader.Interface
         Dictionary<long, ProtoOAPosition> Positions { get; set; }
 
         IHandeler handler { get; set; }
-        public void CreateNewMarketOrder(ProtoOATradeSide TradeSide, long SymbolId, long Volume, string? Label = "", string? Comment = "", decimal StopLoss = 0);
+        public void CreateNewMarketOrder(ProtoOATradeSide TradeSide, long SymbolId, long Volume, string? Label = "", string? Comment = "", decimal StopLoss = 0, decimal TakeProfit = 0);
         void OnMessageReceived(IMessage message);
     }
 }
