@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace TestApplication
 {
-    public class Saver
+    public static class Saver
     {
         /// <summary>
         /// Writes the given object instance to a binary file.
@@ -19,13 +19,7 @@ namespace TestApplication
         /// <param name="append">If false the file will be overwritten if it already exists. If true the contents will be appended to the file.</param>
         public static void WriteToBinaryFile<T>(string filePath, T objectToWrite, bool append = false)
         {
-            using (Stream stream = File.Open(filePath, append ? FileMode.Append : FileMode.Create))
-            {
-                var binaryFormatter = new System.Runtime.Serialization.Formatters.Binary.BinaryFormatter();
-#pragma warning disable SYSLIB0011 // Type or member is obsolete
-                binaryFormatter.Serialize(stream, objectToWrite);
-#pragma warning restore SYSLIB0011 // Type or member is obsolete
-            }
+            File.WriteAllText(filePath, Newtonsoft.Json.JsonConvert.SerializeObject(objectToWrite));
         }
 
         /// <summary>
@@ -36,13 +30,26 @@ namespace TestApplication
         /// <returns>Returns a new instance of the object read from the binary file.</returns>
         public static T ReadFromBinaryFile<T>(string filePath)
         {
-            using (Stream stream = File.Open(filePath, FileMode.Open))
+            return Newtonsoft.Json.JsonConvert.DeserializeObject<T>(File.ReadAllText(filePath));
+        }
+
+        public static TKey GetClosestKey<TKey, TValue>(this IDictionary<TKey, TValue> dict, TKey targetKey)
+    where TKey : IComparable<TKey>
+        {
+            TKey closestKey = default(TKey);
+            double closestDifference = double.MaxValue;
+
+            foreach (var key in dict.Keys)
             {
-                var binaryFormatter = new System.Runtime.Serialization.Formatters.Binary.BinaryFormatter();
-#pragma warning disable SYSLIB0011 // Type or member is obsolete
-                return (T)binaryFormatter.Deserialize(stream);
-#pragma warning restore SYSLIB0011 // Type or member is obsolete
+                double difference = Math.Abs((double)(key.CompareTo(targetKey)));
+                if (difference < closestDifference)
+                {
+                    closestDifference = difference;
+                    closestKey = key;
+                }
             }
+
+            return closestKey;
         }
     }
 }

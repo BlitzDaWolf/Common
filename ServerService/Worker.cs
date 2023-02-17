@@ -28,6 +28,7 @@ namespace ServerService
             while (!stoppingToken.IsCancellationRequested)
             {
                 // _logger.LogInformation("Worker running at: {time}", DateTimeOffset.Now);
+                Client.GetPositions();
                 await Task.Delay(1000, stoppingToken);
             }
         }

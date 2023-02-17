@@ -8,6 +8,8 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="Accord.MachineLearning" Version="3.8.0" />
+    <PackageReference Include="Accord.Neuro" Version="3.8.0" />
     <PackageReference Include="cTrader.OpenAPI.Net" Version="1.4.4" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.2" />
   </ItemGroup>
@@ -15,6 +17,12 @@
   <ItemGroup>
     <ProjectReference Include="..\OpenAPICtrader\OpenAPICtrader.csproj" />
     <ProjectReference Include="..\Strategys\Strategys.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Update="test.json">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
   </ItemGroup>
 
 </Project>

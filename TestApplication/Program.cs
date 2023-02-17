@@ -1,71 +1,78 @@
-﻿using Common;
-using TestApplication;
-using Newtonsoft.Json;
-using System.Security.Cryptography.X509Certificates;
+﻿using Accord.Math;
+using Accord.Neuro;
+using Accord.Neuro.Learning;
+using Common;
 
 SymbolDate[] data = new SymbolDate[1];
 var lines = File.ReadAllText("./test.json");
 lines = lines.Replace("Open", "open").Replace("Close", "close");
 data = Newtonsoft.Json.JsonConvert.DeserializeObject<SymbolDate[]>(lines);
-var t = data.Select(x => (double)x.close).ToList();
 
-void Run(int size = 2)
+int input_size = 5;
+int output_size = 2;
+int total_size = input_size + output_size;
+
+double[][] inputs = new double[data.Length - total_size][];
+double[][] outputs = new double[data.Length - total_size][];
+
+for (int i = 0; i < data.Length - total_size; i++)
 {
-    Console.WriteLine($"Runing {size} For 1000000 epochs");
-    List<TradeEnv> tradeEnv = Enumerable.Range(1, 1).Select(x => new TradeEnv(t, 0.01, size)).ToList();
+    var inp = data.Skip(i).Take(input_size).ToList();
+    var o = data.Skip(i + input_size).Take(output_size).ToList();
 
-    QTrader best = tradeEnv[0].trader;
-    bool first = true;
-
-    for (int e = 0; e < 1000000; e++)
-    //while (best.GetReward() < 0)
-    {
-        /*tradeEnv = tradeEnv.OrderBy(x => x.trader.GetReward()).ToList();
-        tradeEnv.ForEach(x => x.Reset());
-        tradeEnv.ForEach(x => x.trader.Normalize());*/
-        tradeEnv.ForEach(x => x = new TradeEnv(t, 0.01, size));
-        for (int i = size; i < t.Count - 25 - 1440; i++)
-        {
-            tradeEnv.ForEach(x => x.TrainTick(i));
-        }
-
-        tradeEnv.ForEach(x => x.Close(t.Last()));
-        tradeEnv.ForEach(x => x.Reset());
-        for (int i = t.Count - 25 - size - 1440; i < t.Count - 25; i++)
-        {
-            tradeEnv.ForEach(x => x.Tick(i));
-        }
-        tradeEnv = tradeEnv.OrderBy(x => x.trader.score).ToList();
-        var b = tradeEnv.Last();// FirstOrDefault(y => y.trader.GetReward() == tradeEnv.Max(x => x.trader.GetReward()));
-        if (b != null)
-        {
-            var c = Math.Max(b.trader.score, best.score);
-            if (c > best.score || first)
-            {
-                best = b.trader;
-                // File.WriteAllText("./best.json", JsonConvert.SerializeObject(b.trader));
-                Saver.WriteToBinaryFile($"./{size}.dat", b.trader);
-                best = Saver.ReadFromBinaryFile<QTrader>($"./{size}.dat");
-                Console.WriteLine(e + "," + b.trader.score);
-                first = false;
-            }
-            else
-            {
-                b.trader.Reverse(best);
-            }
-            if (e % 20 == 0)
-            {
-                // Console.WriteLine(e + "," + b.trader.GetReward());
-            }
-            best = Saver.ReadFromBinaryFile<QTrader>($"./{size}.dat");
-            Console.Title = (e + ": " + b.trader.score + " - " + (best.score - b.trader.score)).ToString();
-        }
-        // tradeEnv.ForEach(x => x.trader = Saver.ReadFromBinaryFile<QTrader>($"./{size}.dat"));
-        // tradeEnv.Skip(10).Take(10).ToList().ForEach(x => x.trader.Mutate());*/
-    }
+    inputs[i] = inp.Select(x => (double)x.close / (double)inp[0].close).ToArray();
+    outputs[i] = new double[] { o[0].close > inp.Last().close ? 1 : 0, o[0].close > inp.Last().close ? 0 : 1 };/*o.Select(x => (double)x.close / (double)inp[0].close - .5).ToArray();*/
 }
 
-/*for (int i = 2; i < 50; i++)
-{*/
-Run(8);
-//}
+ActivationNetwork network = new ActivationNetwork(
+                new SigmoidFunction(),
+                input_size,  // number of inputs
+                10, 16, 4, // number of neurons in the hidden layer
+                output_size); // number of outputs
+// var t = ActivationNetwork.Load("./Checkpoint/87000.ml");
+
+double GetRealError(int size)
+{
+    double r = 0;
+    for (int i = 0; i < size; i++)
+    {
+        var result = network.Compute(inputs[i]);
+        var hinx = result.IndexOf(result.Max());
+        var rinx = outputs[i].IndexOf(outputs[i].Max());
+        r += (hinx == rinx) ? 1 : 0;
+    }
+    return r / outputs.Length;
+}
+
+BackPropagationLearning teacher = new BackPropagationLearning(network);
+
+teacher.LearningRate = 0.10;
+// Train the network
+double error = double.MaxValue;
+// for (int i = 0; i < 100000; i++)
+int e = 0;
+for (int i = 2500; i < Math.Min(Math.Floor(inputs.Length * 0.8), 50000); i += Math.Min(i, 25))
+{
+    var inp = inputs.TakeLast(i * 1).ToArray();
+    var o = outputs.TakeLast(i * 1).ToArray();
+    error = double.MaxValue;
+    double start = error;
+    double realError = 1;
+    while (realError > 0.01)
+    {
+        {
+            error = teacher.RunEpoch(inp, o);
+        }
+        realError = GetRealError(i);
+        {
+            // Console.WriteLine(e + "," + error);
+            Console.Title = (i + "," + realError);
+        }
+    }
+    network.Save($"./Checkpoint/cp{i}.ml");
+    Console.WriteLine(i + "," + realError);
+    network.Save($"./Checkpoint/Final.ml");
+    int Start = 8;
+    List<double> perdications = data.Skip(Start).Take(input_size).Select(x => (double)x.close).ToList();
+    break;
+}

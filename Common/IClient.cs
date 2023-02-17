@@ -10,8 +10,8 @@ namespace Common
         Task<bool> Connect();
 
         List<Quote> GetQuotes(string symbolName, string timeframe = "5m", int Size = 100);
-        void Subscribe(long symbolName, string timeframe);
-        void Subscribe(long symbolName, string timeframe, IStrategy strategy);
+        void Subscribe(long symbolName, string timeframe, int delay);
+        void Subscribe(long symbolName, string timeframe, IStrategy strategy, int delay);
 
         void Buy(long SymbolId,
             long Volume,
@@ -23,5 +23,7 @@ namespace Common
             string? Label = "",
             string? Comment = "",
             decimal StopLoss = 0);
+
+        void GetPositions();
     }
 }

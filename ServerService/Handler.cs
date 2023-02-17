@@ -48,9 +48,41 @@ namespace ServerService
             return (long)message.CtidTraderAccount.First().CtidTraderAccountId;
         }
 
-        public void OnExecutionEvent(ProtoOAExecutionEvent message)
+        public void OnExecutionEvent(ProtoOAExecutionEvent message, IOpenClient client)
         {
-            Logger.LogInformation(message.ToString());
+            // Logger.LogInformation(message.ToString());
+            if (message.ExecutionType == ProtoOAExecutionType.OrderAccepted)
+            {
+                if (message.Position.PositionStatus == ProtoOAPositionStatus.PositionStatusCreated)
+                {
+                    if (!client.Positions.ContainsKey(message.Position.PositionId))
+                    {
+                        client.Positions.Add(message.Position.PositionId, message.Position);
+                    }
+                }
+            }
+            else if (message.ExecutionType == ProtoOAExecutionType.OrderFilled)
+            {
+                if (message.Position.PositionStatus == ProtoOAPositionStatus.PositionStatusClosed)
+                {
+                    if (client.Positions.ContainsKey(message.Position.PositionId))
+                    {
+                        Logger.LogInformation($"Positions has beed closed: {message.Position.TradeData.SymbolId}");
+                        client.Positions.Remove(message.Position.PositionId);
+                    }
+                }
+            }
+            else if (message.ExecutionType == ProtoOAExecutionType.OrderCancelled)
+            {
+                if (message.Position.PositionStatus == ProtoOAPositionStatus.PositionStatusClosed)
+                {
+                    if (client.Positions.ContainsKey(message.Position.PositionId))
+                    {
+                        Logger.LogInformation($"Positions has beed closed: {message.Position.TradeData.SymbolId}");
+                        client.Positions.Remove(message.Position.PositionId);
+                    }
+                }
+            }
         }
 
         public void OnTick(ProtoOASpotEvent message)
@@ -168,11 +200,17 @@ namespace ServerService
                 CtidTraderAccountId = traderId,
                 SymbolId = symbolId,
                 Period = timeframe,
-                FromTimestamp = DateTimeOffset.UtcNow.AddDays(-4).ToUnixTimeMilliseconds(),
+                FromTimestamp = DateTimeOffset.UtcNow.AddDays(-30).ToUnixTimeMilliseconds(),
                 ToTimestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
             };
 
             await client.SendMessage(request);
+        }
+
+        public async void GetPositions(OpenClient client, long traderId)
+        {
+            /*var request = new ProtoOADealListByPositionIdReq { CtidTraderAccountId = traderId };
+            await client.SendMessage(request);*/
         }
     }
 }

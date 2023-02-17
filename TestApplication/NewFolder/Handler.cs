@@ -173,5 +173,15 @@ namespace TestApplication.NewFolder
 
             await client.SendMessage(request);
         }
+
+        public void GetPositions(OpenClient client, long traderId)
+        {
+            throw new NotImplementedException();
+        }
+
+        public void OnExecutionEvent(ProtoOAExecutionEvent message, IOpenClient client)
+        {
+            throw new NotImplementedException();
+        }
     }
 }

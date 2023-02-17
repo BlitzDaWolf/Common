@@ -12,6 +12,7 @@ namespace TestApplication.NewFolder
     public class Client : IOpenClient
     {
         public IHandeler handler { get; set; }
+        public Dictionary<long, ProtoOAPosition> Positions { get => throw new NotImplementedException(); set => throw new NotImplementedException(); }
 
         public OpenClient _client;
         public Token _token;
@@ -109,7 +110,7 @@ namespace TestApplication.NewFolder
             }
             else if (message is ProtoOAExecutionEvent)
             {
-                handler.OnExecutionEvent((ProtoOAExecutionEvent)message);
+                handler.OnExecutionEvent((ProtoOAExecutionEvent)message, this);
             }
             else if (message is ProtoOASpotEvent)
             {
@@ -180,14 +181,19 @@ namespace TestApplication.NewFolder
         public void Sell(long SymbolId, long Volume, string? Label = "", string? Comment = "", decimal StopLoss = 0) => CreateNewMarketOrder(ProtoOATradeSide.Sell, SymbolId, Volume, Label, Comment, StopLoss);
         #endregion
 
-        public void Subscribe(long symbolName, string timeframe)
+        public void Subscribe(long symbolName, string timeframe, int delay)
         {
             handler.Subscribe(_token, _client, (ProtoOATrendbarPeriod)Enum.Parse(typeof(ProtoOATrendbarPeriod), timeframe, true), symbolName, traderId);
         }
 
-        public void Subscribe(long symbolName, string timeframe, IStrategy strategy)
+        public void Subscribe(long symbolName, string timeframe, IStrategy strategy, int delay)
         {
             handler.Subscribe(_token, _client, (ProtoOATrendbarPeriod)Enum.Parse(typeof(ProtoOATrendbarPeriod), timeframe, true), symbolName, traderId, strategy);
+        }
+
+        public void GetPositions()
+        {
+            throw new NotImplementedException();
         }
     }
 }

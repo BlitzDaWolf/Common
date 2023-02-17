@@ -8,6 +8,8 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="Accord.MachineLearning" Version="3.8.0" />
+    <PackageReference Include="Accord.Neuro" Version="3.8.0" />
     <PackageReference Include="Microsoft.Extensions.Hosting" Version="7.0.0" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.2" />
   </ItemGroup>

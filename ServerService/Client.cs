@@ -1,5 +1,6 @@
 ﻿using Common;
 using Google.Protobuf;
+using Google.Protobuf.Collections;
 using OpenAPI.Net;
 using OpenAPI.Net.Auth;
 using OpenAPI.Net.Helpers;
@@ -19,6 +20,8 @@ namespace ServerService
         private App _app;
         private long traderId;
         private readonly List<IDisposable> _disposables = new();
+
+        public Dictionary<long, ProtoOAPosition> Positions { get; set; } = new Dictionary<long, ProtoOAPosition>();
 
         public Client(ILogger<Client> logger, IHandeler handler)
         {
@@ -112,7 +115,7 @@ namespace ServerService
             }
             else if (message is ProtoOAExecutionEvent)
             {
-                handler.OnExecutionEvent((ProtoOAExecutionEvent)message);
+                handler.OnExecutionEvent((ProtoOAExecutionEvent)message, this);
             }
             else if (message is ProtoOASpotEvent)
             {
@@ -130,13 +133,22 @@ namespace ServerService
             {
 
             }
+            else if (message is ProtoOASubscribeSpotsRes)
+            {
+
+            }
+            else if (message is ProtoOADealListByPositionIdRes)
+            {
+                // Show positions
+                logger.LogInformation($"Received message: {message}");
+            }
+
             else
             {
                 logger.LogInformation($"Received message: {message}");
                 logger.LogInformation($"{message.GetType()}");
             }
         }
-
 
         private async void AccountAuthRequest(long accountId)
         {
@@ -147,6 +159,15 @@ namespace ServerService
             };
 
             await _client.SendMessage(request);
+
+            List<long> ids = new List<long>();
+            ids.Add(1);
+            ids.Add(2);
+            ids.Add(3);
+            ids.Add(4);
+            var r2 = new ProtoOASymbolByIdReq { CtidTraderAccountId = accountId};
+            r2.SymbolId.AddRange(ids);
+            await _client.SendMessage(r2);
         }
 
         #region Market
@@ -165,7 +186,8 @@ namespace ServerService
             if (StopLoss != 0)
             {
                 newOrderReq.TrailingStopLoss = true;
-                newOrderReq.RelativeStopLoss = (long)((int)(StopLoss));
+                newOrderReq.RelativeStopLoss = (long)((StopLoss));
+                newOrderReq.RelativeTakeProfit = (long)((StopLoss / 2));
                 // newOrderReq.RelativeStopLoss = (long)(StopLoss / (PipSize * 1));
             }
 
@@ -181,18 +203,67 @@ namespace ServerService
 
             _client.SendMessage(newOrderReq);
         }
-        public void Buy(long SymbolId, long Volume, string? Label = "", string? Comment = "", decimal StopLoss = 0) => CreateNewMarketOrder(ProtoOATradeSide.Buy, SymbolId, Volume, Label, Comment, StopLoss);
-        public void Sell(long SymbolId, long Volume, string? Label = "", string? Comment = "", decimal StopLoss = 0) => CreateNewMarketOrder(ProtoOATradeSide.Sell, SymbolId, Volume, Label, Comment, StopLoss);
+        public void CancelPosition(long SymbolId, long Volume)
+        {
+            var request = new ProtoOAClosePositionReq
+            {
+                CtidTraderAccountId = traderId,
+                Volume = Volume,
+                PositionId = SymbolId
+            };
+            _client.SendMessage(request);
+        }
+        public void Buy(long SymbolId, long Volume, string? Label = "", string? Comment = "", decimal StopLoss = 0)
+        {
+            var v = Positions.Values.Where(x => x.TradeData.SymbolId == SymbolId).ToList();
+            var c = v.Where(x => x.TradeData.TradeSide == ProtoOATradeSide.Sell).ToList();
+            var d = v.Where(x => x.TradeData.TradeSide == ProtoOATradeSide.Buy).ToList();
+            if (c.Count != 0)
+            {
+                foreach (var item in c)
+                {
+                    CancelPosition(item.PositionId, Volume);
+                }
+            }
+            if (d.Count == 0)
+            {
+                CreateNewMarketOrder(ProtoOATradeSide.Buy, SymbolId, Volume, Label, Comment, StopLoss);
+            }
+        }
+        public void Sell(long SymbolId, long Volume, string? Label = "", string? Comment = "", decimal StopLoss = 0)
+        {
+            var v = Positions.Values.Where(x => x.TradeData.SymbolId == SymbolId).ToList();
+            var c = v.Where(x => x.TradeData.TradeSide == ProtoOATradeSide.Buy).ToList();
+            var d = v.Where(x => x.TradeData.TradeSide == ProtoOATradeSide.Sell).ToList();
+            if (c.Count != 0)
+            {
+                foreach (var item in c)
+                {
+                    CancelPosition(item.PositionId, Volume);
+                }
+            }
+            if (d.Count == 0)
+            {
+                CreateNewMarketOrder(ProtoOATradeSide.Sell, SymbolId, Volume, Label, Comment, StopLoss);
+            }
+        }
         #endregion
 
-        public void Subscribe(long symbolName, string timeframe)
+        public async void Subscribe(long symbolName, string timeframe, int delay)
         {
+            await Task.Delay(delay * 1000);
             handler.Subscribe(_token, _client, (ProtoOATrendbarPeriod)System.Enum.Parse(typeof(ProtoOATrendbarPeriod), timeframe, true), symbolName, traderId);
         }
 
-        public void Subscribe(long symbolName, string timeframe, IStrategy strategy)
+        public async void Subscribe(long symbolName, string timeframe, IStrategy strategy, int delay)
         {
+            await Task.Delay(delay * 1000);
             handler.Subscribe(_token, _client, (ProtoOATrendbarPeriod)System.Enum.Parse(typeof(ProtoOATrendbarPeriod), timeframe, true), symbolName, traderId, strategy);
+        }
+
+        public void GetPositions()
+        {
+            handler.GetPositions(_client, traderId);
         }
     }
 }

@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.Data;
 using System.Linq;
+using System.Threading;
 
 namespace Common
 {
@@ -44,7 +45,8 @@ namespace Common
                     CurrentBar[timeFrame] = q;
                     if (Strategies.ContainsKey(timeFrame))
                     {
-                        Strategies[timeFrame].OnBar(Bars[timeFrame]);
+                        Thread t = new Thread(() => { Strategies[timeFrame].OnBar(Bars[timeFrame]); });
+                        t.Start();
                     }
                 }
 
@@ -93,6 +95,8 @@ namespace Common
                         SymbolId = SymbolId,
                     });
                 }
+                Thread t = new Thread(() => { Strategies[timeFrame].OnBar(Bars[timeFrame]); });
+                t.Start();
             }
         }
 
