@@ -13,82 +13,80 @@ using static System.Runtime.InteropServices.JavaScript.JSType;
 
 namespace ServerService
 {
-    public class StrategySymbol
+    enum VolitilityType
     {
-        public long SymbolID { get; set; }
-        public string TimeFrame { get; set; }
-        public decimal TPPip { get; set; }
-        public decimal SLPip { get; set; }
-        public long LotSize { get; set; }
+        Low, Medium, High,
     }
 
     public class Strategy : BaseStrategy
     {
         int input_size = 15;
-        private ILogger<Strategy> _logger;
 
         //public Network Network { get; }
-        Dictionary<long, ActivationNetwork> networks = new Dictionary<long, ActivationNetwork>();
-        Dictionary<long, StrategySymbol> StrategyValues = new Dictionary<long, StrategySymbol>();
+        ActivationNetwork network;
+        StrategySymbol StrategyValues;
 
-        public Strategy(IOpenClient clinet, ILogger<Strategy> logger, IConfiguration config)
+        public Strategy(IOpenClient clinet, StrategySymbol strategySymbol)
         {
             Client = clinet;
-            var l = config.GetSection("strategy:value").Get<StrategySymbol[]>();
-            int i = 1;
-            foreach (var item in l)
-            {
-                StrategyValues.Add(item.SymbolID, item);
-                clinet.Subscribe(item.SymbolID, item.TimeFrame, this, i++);
-            }
+            network = new ActivationNetwork(
+                new SigmoidFunction(),
+                input_size,  // number of inputs
+                10, 16, 4, // number of neurons in the hidden layer
+                2); // number of outputs
+            StrategyValues = strategySymbol;
+        }
 
-            /*clinet.Subscribe(22396, "M30", this, 3);
-            clinet.Subscribe(22398, "M30", this, 3);*/
-            // clinet.Subscribe(2, "M1", this);
-            _logger = logger;
-            //Network = ActivationNetwork.Load(@"D:\dev\Common\TestApplication\bin\Release\net7.0\Checkpoint\Final.ml");
+        VolitilityType calculateType(double value)
+        {
+            if (value > 40)
+                return VolitilityType.High;
+            if (value > 20)
+                return VolitilityType.Medium;
+            return VolitilityType.Low;
         }
 
         public override void OnBar(List<OLHC> bars)
         {
-            var v = StrategyValues[bars[0].SymbolId];
+            var res = bars.GetMfi().Where(x => x.Mfi != null).Select(x => Math.Abs(x.Mfi.Value - 50)).Select(calculateType).ToList();//.Select(x => Math.Abs(x.Mfi.Value - 50)).ToList();
+            bars.GetSuperTrend();
+            var v = StrategyValues;
+            long stock = 50 * v.LotSize;
+
+
+            return;
+
+
+            /*Client.Buy(22398, 50, StopLoss: 100000 * v.SLPip * v.Pipsize, TakeProfit: 100000 * v.TPPip * v.Pipsize);
+            _logger.LogInformation($"({v.SymbolID}, {stock}, {100000 * v.SLPip * v.Pipsize}, {100000 * v.TPPip * v.Pipsize})");
+            return;*/
+
             var rsl =  (bars.Last().Close * 0.001m) * 100000;
             var b = bars.Select(x => (double)x.Close).TakeLast((60 / 1) * 24 * 30).ToList();
-            if (networks.ContainsKey(bars[0].SymbolId))
+            if (network!= null)
             {
                 var inp = b.TakeLast(input_size).ToList();
-                var result = networks[bars[0].SymbolId].Compute(inp.Select(x => x / inp[0]).ToArray());
+                var result = network.Compute(inp.Select(x => x / inp[0]).ToArray());
                 var difrence = Math.Abs(result[0] - result[1]);
-                // _logger.LogInformation(bars[0].SymbolId + ": " + string.Join(',', result) + "\n" + difrence);
-                long stock = 50 * v.LotSize;
+
                 if (result[0] > result[1])
                 {
                     if (difrence > 0.15)
                     {
-                        Client.Buy(v.SymbolID, stock, StopLoss: (v.SLPip * v.LotSize) * 100000, TakeProfit: (v.TPPip * v.LotSize) * 100000);
+                        Client.Buy(v.SymbolID, stock, StopLoss: 100000 * v.SLPip * v.Pipsize, TakeProfit: 100000 * v.TPPip * v.Pipsize);
                     }
                 }
                 else
                 {
                     if (difrence > 0.15)
                     {
-                        Client.Sell(v.SymbolID, stock, StopLoss: (v.SLPip * v.LotSize) * 100000, TakeProfit: (v.TPPip * v.LotSize) * 100000);
+                        Client.Sell(v.SymbolID, stock, StopLoss: 100000 * v.SLPip * v.Pipsize, TakeProfit: 100000 * v.TPPip * v.Pipsize);
                     }
                 }
             }
-            else
-            {
-                ActivationNetwork network = new ActivationNetwork(
-                    new SigmoidFunction(),
-                    input_size,  // number of inputs
-                    10, 16, 4, // number of neurons in the hidden layer
-                    2); // number of outputs
-                networks.Add(bars[0].SymbolId, network);
-            }
-            BackPropagationLearning teacher = new BackPropagationLearning(networks[bars[0].SymbolId]);
+            BackPropagationLearning teacher = new BackPropagationLearning(network);
             teacher.LearningRate = 0.05;
             {
-                _logger.LogInformation($"{bars[0].SymbolId}: Training started @ {DateTime.Now}");
                 Stopwatch sw = new Stopwatch();
                 sw.Start();
 
@@ -104,22 +102,36 @@ namespace ServerService
                     outputs.Add(new double[2] { change > a ? 1 : 0, change < -a ? 1 : 0 });
                 }
 
-                inputs =   inputs.TakeLast(25).ToList();
-                outputs = outputs.TakeLast(25).ToList();
+                int t = v.TimeFrame.StartsWith("H") ? 60 : int.Parse(v.TimeFrame.Replace("M", ""));
+
                 {
-                    int i = 0;
+                    int i = 5;
                     // for (int i = 0; i < 250; i++)
-                    double error = double.MaxValue;
                     var lastM = 0;
-                    while (error > 0.5 && (DateTime.Now.Minute) != 55)
+                    var score = (double)((DateTime.Now.Minute) % t) / t;
+                    while (score < 0.9)
                     {
-                        error = teacher.RunEpoch(inputs.ToArray(), outputs.ToArray());
+                        double error = double.MaxValue;
+                        var inp = inputs.TakeLast(i).ToList();
+                        var o  = outputs.TakeLast(i).ToList();
+                        while (error > 0.5 && score < 0.9)
+                        {
+                            score = (double)((DateTime.Now.Minute) % t) / t;
+                            error = teacher.RunEpoch(inp.ToArray(), o.ToArray());
+                        }
                         i++;
                     }
-                    _logger.LogInformation($"{bars[0].SymbolId}: Training done [{error}] [{sw.Elapsed}]");
                 }
                 sw.Stop();
             }
+        }
+
+        public void OnPip(List<OLHC> bars)
+        {
+            var st = bars.GetSuperTrend();
+            var bb = bars.GetBollingerBands();
+
+
         }
     }
 }

@@ -9,13 +9,12 @@ namespace ServerService
 
         public IOpenClient Client { get; }
 
-        public Worker(ILogger<Worker> logger, IOpenClient clnt, IStrategy strategy)
+        public Worker(ILogger<Worker> logger, IOpenClient clnt, StrategyDispatcher strategy)
         {
             _logger = logger;
             Client = clnt;
-            strategy.Init();
-
         }
+
         public Worker()
         {
 

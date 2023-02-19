@@ -12,7 +12,7 @@ IHost host = Host.CreateDefaultBuilder(args)
         services.AddSingleton<IHandeler, Handler>();
         services.AddSingleton<IOpenClient, Client>();
 
-        services.AddSingleton<IStrategy, Strategy>();
+        services.AddSingleton<StrategyDispatcher, StrategyDispatcher>();
 
         services.AddHostedService<Worker>();
     })
