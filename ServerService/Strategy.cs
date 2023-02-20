@@ -46,6 +46,52 @@ namespace ServerService
             return VolitilityType.Low;
         }
 
+        void LowTrade(List<OLHC> bars)
+        {
+            var EMA = bars.GetEma(100);
+            if ((double)bars.Last().Close > EMA.Last().Ema.Value)
+            {
+                // Sell
+                Sell();
+            }
+            else
+            {
+                // Buy
+                Buy();
+            }
+        }
+
+        void MidTrade(List<OLHC> bars)
+        {
+            var trend = bars.GetSuperTrend(10, 3);
+            if (trend.Last().UpperBand != null)
+            {
+                // Sell
+                Sell();
+            }
+            else
+            {
+                // Buy
+                Buy();
+            }
+        }
+
+        void Buy()
+        {
+            Client.Buy(StrategyValues.SymbolID,
+                (long)(StrategyValues.LotSize* 0.5) * 100, "", "",
+                100000 * StrategyValues.TPPip * StrategyValues.Pipsize,
+                100000 * StrategyValues.TPPip * StrategyValues.Pipsize);
+        }
+
+        void Sell()
+        {
+            Client.Sell(StrategyValues.SymbolID,
+                (long)(StrategyValues.LotSize * 0.5) * 100, "", "",
+                100000 * StrategyValues.TPPip * StrategyValues.Pipsize,
+                100000 * StrategyValues.TPPip * StrategyValues.Pipsize);
+        }
+
         public override void OnBar(List<OLHC> bars)
         {
             var res = bars.GetMfi().Where(x => x.Mfi != null).Select(x => Math.Abs(x.Mfi.Value - 50)).Select(calculateType).ToList();//.Select(x => Math.Abs(x.Mfi.Value - 50)).ToList();
@@ -53,6 +99,14 @@ namespace ServerService
             var v = StrategyValues;
             long stock = 50 * v.LotSize;
 
+            if (res.Last() == VolitilityType.Low)
+            {
+                LowTrade(bars);
+            }
+            else if (res.Last() == VolitilityType.Medium)
+            {
+                MidTrade(bars);
+            }
 
             return;
 

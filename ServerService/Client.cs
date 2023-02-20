@@ -187,7 +187,6 @@ namespace ServerService
 
             if (StopLoss != 0)
             {
-                newOrderReq.TrailingStopLoss = true;
                 newOrderReq.RelativeStopLoss = (long)((StopLoss));
                 newOrderReq.RelativeTakeProfit = (long)((TakeProfit));
                 // newOrderReq.RelativeStopLoss = (long)(StopLoss / (PipSize * 1));
